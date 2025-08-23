@@ -1,4 +1,4 @@
-import 'package:amuma/screens/dashboard_screen.dart';
+import 'package:amuma/screens/splash_screen.dart';
 import 'package:amuma/services/local_storage_service.dart';
 import 'package:amuma/utils/colors.dart';
 import 'package:flutter/material.dart';
@@ -53,7 +53,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const DashboardScreen(),
+      home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
