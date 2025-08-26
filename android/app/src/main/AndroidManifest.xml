@@ -23,7 +23,7 @@
         </intent>
     </queries>
     <application
-        android:label="amuma"
+        android:label="Amuma"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
