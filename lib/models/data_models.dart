@@ -30,12 +30,32 @@ class MedicationModel {
   }
 
   factory MedicationModel.fromMap(Map<String, dynamic> map) {
+    // Handle times field - could be String (JSON) or List
+    List<String> timesList;
+    if (map['times'] is String) {
+      timesList = List<String>.from(jsonDecode(map['times']));
+    } else if (map['times'] is List) {
+      timesList = List<String>.from(map['times']);
+    } else {
+      timesList = [];
+    }
+
+    // Handle isCompleted field - could be String (JSON) or List
+    List<bool> isCompletedList;
+    if (map['isCompleted'] is String) {
+      isCompletedList = List<bool>.from(jsonDecode(map['isCompleted']));
+    } else if (map['isCompleted'] is List) {
+      isCompletedList = List<bool>.from(map['isCompleted']);
+    } else {
+      isCompletedList = [];
+    }
+
     return MedicationModel(
       id: map['id'],
       name: map['name'],
       dosage: map['dosage'],
-      times: List<String>.from(jsonDecode(map['times'])),
-      isCompleted: List<bool>.from(jsonDecode(map['isCompleted'])),
+      times: timesList,
+      isCompleted: isCompletedList,
       createdAt: DateTime.parse(map['createdAt']),
     );
   }

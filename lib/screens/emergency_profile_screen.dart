@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:amuma/utils/colors.dart';
 import 'package:amuma/widgets/text_widget.dart';
 import 'package:amuma/widgets/button_widget.dart';
 import 'package:amuma/services/firebase_service.dart';
 import 'package:amuma/models/data_models.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 
 class EmergencyProfileScreen extends StatefulWidget {
   const EmergencyProfileScreen({super.key});
@@ -573,110 +576,132 @@ class _EmergencyProfileScreenState extends State<EmergencyProfileScreen> {
   void _editProfile() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: TextWidget(
-          text: 'Edit Profile',
-          fontSize: 18,
-          color: textLight,
-          fontFamily: 'Bold',
-        ),
-        content: TextWidget(
-          text: 'Profile editing coming soon!',
-          fontSize: 14,
-          color: textGrey,
-          fontFamily: 'Regular',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: TextWidget(
-              text: 'OK',
-              fontSize: 14,
-              color: primary,
-              fontFamily: 'Medium',
-            ),
-          ),
-        ],
+      builder: (context) => _EditProfileDialog(
+        firebaseService: _firebaseService,
+        onProfileUpdated: () => setState(() {}),
       ),
     );
   }
 
-  void _callEmergency() {
-    // In a real app, this would make an actual call
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: TextWidget(
-          text: 'Emergency Call',
-          fontSize: 18,
-          color: Colors.red.shade700,
-          fontFamily: 'Bold',
-        ),
-        content: TextWidget(
-          text: 'Calling emergency services...',
-          fontSize: 14,
-          color: textGrey,
-          fontFamily: 'Regular',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: TextWidget(
-              text: 'Cancel',
-              fontSize: 14,
-              color: primary,
-              fontFamily: 'Medium',
-            ),
-          ),
-        ],
-      ),
-    );
+  Future<void> _callEmergency() async {
+    try {
+      final Uri phoneUri = Uri(scheme: 'tel', path: '911');
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        _showErrorDialog('Unable to make call', 'Phone app not available');
+      }
+    } catch (e) {
+      _showErrorDialog('Call Failed', 'Unable to make emergency call');
+    }
   }
 
-  void _shareProfile() {
-    // In a real app, this would share the profile information
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: TextWidget(
-          text: 'Share Profile',
-          fontSize: 18,
-          color: textLight,
-          fontFamily: 'Bold',
-        ),
-        content: TextWidget(
-          text: 'Sharing emergency profile information...',
-          fontSize: 14,
-          color: textGrey,
-          fontFamily: 'Regular',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: TextWidget(
-              text: 'OK',
-              fontSize: 14,
-              color: primary,
-              fontFamily: 'Medium',
-            ),
-          ),
-        ],
-      ),
-    );
+  Future<void> _shareProfile() async {
+    try {
+      final profile = await _firebaseService.getUserProfile();
+      final medications = await _firebaseService.getMedications().first;
+      final contacts = await _firebaseService.getEmergencyContacts().first;
+
+      String profileText = '🆘 EMERGENCY MEDICAL PROFILE 🆘\n\n';
+
+      if (profile != null) {
+        profileText += '👤 PATIENT INFORMATION:\n';
+        profileText += 'Name: ${profile.name ?? "Not specified"}\n';
+        profileText += 'DOB: ${profile.dateOfBirth ?? "Not specified"}\n';
+        profileText += 'Gender: ${profile.gender ?? "Not specified"}\n';
+        profileText += 'Blood Type: ${profile.bloodType ?? "Not specified"}\n';
+
+        if (profile.allergies != null && profile.allergies!.isNotEmpty) {
+          profileText += 'Allergies: ${profile.allergies!.join(", ")}\n';
+        }
+
+        if (profile.chronicConditions != null &&
+            profile.chronicConditions!.isNotEmpty) {
+          profileText += '\n🏥 MEDICAL CONDITIONS:\n';
+          for (String condition in profile.chronicConditions!) {
+            profileText += '• $condition\n';
+          }
+        }
+      }
+
+      if (medications.isNotEmpty) {
+        profileText += '\n💊 CURRENT MEDICATIONS:\n';
+        for (var medication in medications) {
+          profileText += '• ${medication.name} - ${medication.dosage}\n';
+        }
+      }
+
+      if (contacts.isNotEmpty) {
+        profileText += '\n📞 EMERGENCY CONTACTS:\n';
+        for (var contact in contacts) {
+          profileText +=
+              '• ${contact.name} (${contact.relationship}): ${contact.phone}\n';
+        }
+      }
+
+      profileText += '\n🚨 EMERGENCY NUMBERS:\n';
+      profileText += '• Emergency Hotline: 911\n';
+      profileText += '• DOH Hotline: 1555\n';
+      profileText += '• Red Cross: 143\n';
+      profileText += '• NDRRMC: (02) 8911-1406\n';
+
+      await Share.share(
+        profileText,
+        subject: 'Emergency Medical Profile',
+      );
+    } catch (e) {
+      _showErrorDialog('Share Failed', 'Unable to share profile information');
+    }
   }
 
   void _addContact() {
     showDialog(
       context: context,
+      builder: (context) => _AddContactDialog(
+        firebaseService: _firebaseService,
+        onContactAdded: () => setState(() {}),
+      ),
+    );
+  }
+
+  Future<void> _callContact(String phone) async {
+    try {
+      final Uri phoneUri = Uri(scheme: 'tel', path: phone);
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        _showErrorDialog('Unable to make call', 'Phone app not available');
+      }
+    } catch (e) {
+      _showErrorDialog('Call Failed', 'Unable to call $phone');
+    }
+  }
+
+  Future<void> _callEmergencyNumber(String number) async {
+    try {
+      final Uri phoneUri = Uri(scheme: 'tel', path: number);
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        _showErrorDialog('Unable to make call', 'Phone app not available');
+      }
+    } catch (e) {
+      _showErrorDialog('Call Failed', 'Unable to call $number');
+    }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
       builder: (context) => AlertDialog(
         title: TextWidget(
-          text: 'Add Emergency Contact',
+          text: title,
           fontSize: 18,
-          color: textLight,
+          color: Colors.red.shade700,
           fontFamily: 'Bold',
         ),
         content: TextWidget(
-          text: 'Contact management coming soon!',
+          text: message,
           fontSize: 14,
           color: textGrey,
           fontFamily: 'Regular',
@@ -695,68 +720,496 @@ class _EmergencyProfileScreenState extends State<EmergencyProfileScreen> {
       ),
     );
   }
+}
 
-  void _callContact(String phone) {
-    // In a real app, this would make an actual call
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: TextWidget(
-          text: 'Calling',
-          fontSize: 18,
-          color: textLight,
-          fontFamily: 'Bold',
-        ),
-        content: TextWidget(
-          text: 'Calling $phone...',
-          fontSize: 14,
-          color: textGrey,
-          fontFamily: 'Regular',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: TextWidget(
-              text: 'Cancel',
-              fontSize: 14,
-              color: primary,
-              fontFamily: 'Medium',
+// Edit Profile Dialog Widget
+class _EditProfileDialog extends StatefulWidget {
+  final FirebaseService firebaseService;
+  final VoidCallback onProfileUpdated;
+
+  const _EditProfileDialog({
+    required this.firebaseService,
+    required this.onProfileUpdated,
+  });
+
+  @override
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
+}
+
+class _EditProfileDialogState extends State<_EditProfileDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _dobController = TextEditingController();
+  final _bloodTypeController = TextEditingController();
+  final _allergiesController = TextEditingController();
+
+  String? _selectedGender;
+  List<String> _selectedConditions = [];
+  bool _isLoading = false;
+
+  final List<String> _bloodTypes = [
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-'
+  ];
+  final List<String> _genders = [
+    'Male',
+    'Female',
+    'Other',
+    'Prefer not to say'
+  ];
+  final List<String> _conditions = [
+    'Diabetes Mellitus',
+    'Hypertension',
+    'Chronic Kidney Disease',
+    'Cardiovascular Disease',
+    'Asthma',
+    'Arthritis',
+    'Depression/Anxiety',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentProfile();
+  }
+
+  Future<void> _loadCurrentProfile() async {
+    final profile = await widget.firebaseService.getUserProfile();
+    if (profile != null) {
+      setState(() {
+        _nameController.text = profile.name ?? '';
+        _dobController.text = profile.dateOfBirth ?? '';
+        _bloodTypeController.text = profile.bloodType ?? '';
+        _selectedGender = profile.gender;
+        _allergiesController.text = profile.allergies?.join(', ') ?? '';
+        _selectedConditions = profile.chronicConditions ?? [];
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: TextWidget(
+        text: 'Edit Emergency Profile',
+        fontSize: 18,
+        color: textLight,
+        fontFamily: 'Bold',
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Full Name
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name*',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Full name is required';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Date of Birth
+                TextFormField(
+                  controller: _dobController,
+                  decoration: const InputDecoration(
+                    labelText: 'Date of Birth (YYYY-MM-DD)',
+                    border: OutlineInputBorder(),
+                    hintText: '1990-01-15',
+                  ),
+                  onTap: () async {
+                    DateTime? pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now()
+                          .subtract(const Duration(days: 365 * 25)),
+                      firstDate: DateTime(1900),
+                      lastDate: DateTime.now(),
+                    );
+                    if (pickedDate != null) {
+                      _dobController.text =
+                          pickedDate.toIso8601String().split('T')[0];
+                    }
+                  },
+                  readOnly: true,
+                ),
+                const SizedBox(height: 16),
+
+                // Gender
+                DropdownButtonFormField<String>(
+                  value: _selectedGender,
+                  decoration: const InputDecoration(
+                    labelText: 'Gender',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _genders
+                      .map((gender) => DropdownMenuItem(
+                            value: gender,
+                            child: Text(gender),
+                          ))
+                      .toList(),
+                  onChanged: (value) => setState(() => _selectedGender = value),
+                ),
+                const SizedBox(height: 16),
+
+                // Blood Type
+                DropdownButtonFormField<String>(
+                  value: _bloodTypes.contains(_bloodTypeController.text)
+                      ? _bloodTypeController.text
+                      : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Blood Type',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _bloodTypes
+                      .map((type) => DropdownMenuItem(
+                            value: type,
+                            child: Text(type),
+                          ))
+                      .toList(),
+                  onChanged: (value) => _bloodTypeController.text = value ?? '',
+                ),
+                const SizedBox(height: 16),
+
+                // Allergies
+                TextFormField(
+                  controller: _allergiesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Known Allergies (comma-separated)',
+                    border: OutlineInputBorder(),
+                    hintText: 'Penicillin, Peanuts, Shellfish',
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+
+                // Medical Conditions
+                TextWidget(
+                  text: 'Medical Conditions:',
+                  fontSize: 14,
+                  color: textLight,
+                  fontFamily: 'Medium',
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: _conditions.map((condition) {
+                    final isSelected = _selectedConditions.contains(condition);
+                    return FilterChip(
+                      label: Text(
+                        condition,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isSelected ? Colors.white : textGrey,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedColor: primary,
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedConditions.add(condition);
+                          } else {
+                            _selectedConditions.remove(condition);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          child: TextWidget(
+            text: 'Cancel',
+            fontSize: 14,
+            color: textGrey,
+            fontFamily: 'Medium',
+          ),
+        ),
+        TextButton(
+          onPressed: _isLoading ? null : _saveProfile,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : TextWidget(
+                  text: 'Save',
+                  fontSize: 14,
+                  color: primary,
+                  fontFamily: 'Medium',
+                ),
+        ),
+      ],
     );
   }
 
-  void _callEmergencyNumber(String number) {
-    // In a real app, this would make an actual call
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: TextWidget(
-          text: 'Emergency Call',
-          fontSize: 18,
-          color: Colors.red.shade700,
-          fontFamily: 'Bold',
-        ),
-        content: TextWidget(
-          text: 'Calling $number...',
-          fontSize: 14,
-          color: textGrey,
-          fontFamily: 'Regular',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: TextWidget(
-              text: 'Cancel',
-              fontSize: 14,
-              color: primary,
-              fontFamily: 'Medium',
-            ),
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final profile = UserProfileModel(
+        name: _nameController.text.trim(),
+        dateOfBirth:
+            _dobController.text.isNotEmpty ? _dobController.text : null,
+        gender: _selectedGender,
+        bloodType: _bloodTypeController.text.isNotEmpty
+            ? _bloodTypeController.text
+            : null,
+        chronicConditions:
+            _selectedConditions.isNotEmpty ? _selectedConditions : null,
+        allergies: _allergiesController.text.isNotEmpty
+            ? _allergiesController.text.split(',').map((e) => e.trim()).toList()
+            : null,
+        preferredLanguage: 'EN',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      final success = await widget.firebaseService.saveUserProfile(profile);
+
+      if (success) {
+        widget.onProfileUpdated();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully'),
+            backgroundColor: healthGreen,
           ),
-        ],
+        );
+      } else {
+        throw Exception('Failed to save profile');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving profile: ${e.toString()}'),
+          backgroundColor: healthRed,
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _dobController.dispose();
+    _bloodTypeController.dispose();
+    _allergiesController.dispose();
+    super.dispose();
+  }
+}
+
+// Add Contact Dialog Widget
+class _AddContactDialog extends StatefulWidget {
+  final FirebaseService firebaseService;
+  final VoidCallback onContactAdded;
+
+  const _AddContactDialog({
+    required this.firebaseService,
+    required this.onContactAdded,
+  });
+
+  @override
+  State<_AddContactDialog> createState() => _AddContactDialogState();
+}
+
+class _AddContactDialogState extends State<_AddContactDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _relationshipController = TextEditingController();
+  bool _isPrimary = false;
+  bool _isLoading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: TextWidget(
+        text: 'Add Emergency Contact',
+        fontSize: 18,
+        color: textLight,
+        fontFamily: 'Bold',
       ),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Contact Name
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Full Name*',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Contact name is required';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Phone Number
+            TextFormField(
+              controller: _phoneController,
+              decoration: const InputDecoration(
+                labelText: 'Phone Number*',
+                border: OutlineInputBorder(),
+                hintText: '+63 912 345 6789',
+              ),
+              keyboardType: TextInputType.phone,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Phone number is required';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Relationship
+            TextFormField(
+              controller: _relationshipController,
+              decoration: const InputDecoration(
+                labelText: 'Relationship*',
+                border: OutlineInputBorder(),
+                hintText: 'Spouse, Parent, Sibling, Friend, etc.',
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Relationship is required';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Primary Contact Checkbox
+            Row(
+              children: [
+                Checkbox(
+                  value: _isPrimary,
+                  onChanged: (value) =>
+                      setState(() => _isPrimary = value ?? false),
+                ),
+                Expanded(
+                  child: TextWidget(
+                    text: 'Primary Emergency Contact',
+                    fontSize: 14,
+                    color: textLight,
+                    fontFamily: 'Regular',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          child: TextWidget(
+            text: 'Cancel',
+            fontSize: 14,
+            color: textGrey,
+            fontFamily: 'Medium',
+          ),
+        ),
+        TextButton(
+          onPressed: _isLoading ? null : _saveContact,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : TextWidget(
+                  text: 'Add Contact',
+                  fontSize: 14,
+                  color: primary,
+                  fontFamily: 'Medium',
+                ),
+        ),
+      ],
     );
+  }
+
+  Future<void> _saveContact() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final contact = EmergencyContactModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        relationship: _relationshipController.text.trim(),
+        isPrimary: _isPrimary,
+      );
+
+      final success = await widget.firebaseService.addEmergencyContact(contact);
+
+      if (success) {
+        widget.onContactAdded();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Emergency contact added successfully'),
+            backgroundColor: healthGreen,
+          ),
+        );
+      } else {
+        throw Exception('Failed to save contact');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error adding contact: ${e.toString()}'),
+          backgroundColor: healthRed,
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _relationshipController.dispose();
+    super.dispose();
   }
 }

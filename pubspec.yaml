@@ -58,6 +58,12 @@ dependencies:
   # JSON and HTTP
   http: ^1.1.0
   json_annotation: ^4.8.1
+  
+  # URL Launcher and Share
+  url_launcher: ^6.2.2
+  share_plus: ^7.2.2
+  
+  # Firebase
   firebase_core:
   cloud_firestore:
   firebase_storage:

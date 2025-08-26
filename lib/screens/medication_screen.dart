@@ -150,6 +150,7 @@ class _MedicationScreenState extends State<MedicationScreen> {
                   }
 
                   if (snapshot.hasError) {
+                    print(snapshot.error);
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,

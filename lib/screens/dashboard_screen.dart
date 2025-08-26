@@ -7,6 +7,7 @@ import 'package:amuma/screens/education_screen.dart';
 import 'package:amuma/screens/emergency_profile_screen.dart';
 import 'package:amuma/screens/appointment_screen.dart';
 import 'package:amuma/screens/gamification_screen.dart';
+import 'package:amuma/screens/notification_screen.dart';
 import 'package:amuma/services/firebase_service.dart';
 import 'package:amuma/services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -222,44 +223,54 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                     ),
                   ),
                   // Notification Bell with Badge
-                  Stack(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: primary.withOpacity(0.1)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationScreen(),
                         ),
-                        child: const Icon(
-                          Icons.notifications_outlined,
-                          color: primary,
-                          size: 24,
-                        ),
-                      ),
-                      // Notification Badge (show if there are pending tasks)
-                      if ((_medicationStats['totalDoses'] ?? 0) >
-                          (_medicationStats['completedDoses'] ?? 0))
-                        Positioned(
-                          right: 6,
-                          top: 6,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: healthRed,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
+                      );
+                    },
+                    child: Stack(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: surface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: primary.withOpacity(0.1)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.notifications_outlined,
+                            color: primary,
+                            size: 24,
                           ),
                         ),
-                    ],
+                        // Notification Badge (show if there are pending tasks)
+                        if ((_medicationStats['totalDoses'] ?? 0) >
+                            (_medicationStats['completedDoses'] ?? 0))
+                          Positioned(
+                            right: 6,
+                            top: 6,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: healthRed,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ],
               ),

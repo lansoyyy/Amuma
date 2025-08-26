@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:amuma/models/data_models.dart';
@@ -60,7 +61,7 @@ class FirebaseService {
       if (userDoc == null) return false;
 
       await userDoc.collection('medications').doc(medicationId).update({
-        'isCompleted': isCompleted.map((e) => e).toList(),
+        'isCompleted': jsonEncode(isCompleted),
       });
       return true;
     } catch (e) {
