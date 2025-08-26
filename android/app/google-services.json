@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "891226909570",
+    "project_id": "amuma-202b8",
+    "storage_bucket": "amuma-202b8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:891226909570:android:adc64652eabf8546997d9b",
+        "android_client_info": {
+          "package_name": "com.example.amuma"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsbUVF3wRozEmIwz8_Eaekhm3ONtg2KDg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

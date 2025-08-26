@@ -1,12 +1,17 @@
+import 'package:amuma/firebase_options.dart';
 import 'package:amuma/screens/splash_screen.dart';
 import 'package:amuma/services/local_storage_service.dart';
 import 'package:amuma/utils/colors.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    name: 'amuma-202b8',
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  // Initialize local storage service
   await LocalStorageService().initialize();
 
   runApp(const MyApp());
