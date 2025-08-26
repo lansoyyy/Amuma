@@ -3,6 +3,7 @@ import 'package:amuma/utils/colors.dart';
 import 'package:amuma/widgets/text_widget.dart';
 import 'package:amuma/widgets/button_widget.dart';
 import 'package:amuma/screens/dashboard_screen.dart';
+import 'package:amuma/services/auth_service.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -47,13 +48,53 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     'Regular Check-ups',
   ];
 
+  bool _validateCurrentStep() {
+    switch (_currentStep) {
+      case 0:
+        // Basic info step - at least age and gender should be provided
+        if (_ageController.text.trim().isEmpty || _selectedGender == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please provide at least your age and gender'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return false;
+        }
+        return true;
+      case 1:
+        // Health conditions step - no validation required, it's optional
+        return true;
+      case 2:
+        // Health goals step - at least one goal should be selected
+        if (_selectedGoals.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select at least one health goal'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return false;
+        }
+        return true;
+      default:
+        return true;
+    }
+  }
+
   void _nextStep() {
     if (_currentStep < 2) {
-      setState(() {
-        _currentStep++;
-      });
+      // Validate current step before proceeding
+      if (_validateCurrentStep()) {
+        setState(() {
+          _currentStep++;
+        });
+      }
     } else {
-      _completeSetup();
+      // Final step - validate and complete setup
+      if (_validateCurrentStep()) {
+        _completeSetup();
+      }
     }
   }
 
@@ -70,32 +111,75 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _isLoading = true;
     });
 
-    // Simulate saving profile data
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Prepare profile data to save
+      final profileData = {
+        'age': _ageController.text.isNotEmpty
+            ? int.tryParse(_ageController.text)
+            : null,
+        'gender': _selectedGender,
+        'height': _heightController.text.isNotEmpty
+            ? double.tryParse(_heightController.text)
+            : null,
+        'weight': _weightController.text.isNotEmpty
+            ? double.tryParse(_weightController.text)
+            : null,
+        'chronicConditions': _selectedConditions,
+        'healthGoals': _selectedGoals,
+        'profileComplete': true,
+        'profileCompletedAt': DateTime.now().toIso8601String(),
+      };
 
-    setState(() {
-      _isLoading = false;
-    });
+      // Save profile data to Firebase
+      final success = await AuthService().updateUserData(profileData);
 
-    // Navigate to dashboard
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              const DashboardScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
+      if (success) {
+        if (mounted) {
+          // Navigate to dashboard
+          Navigator.pushReplacement(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const DashboardScreen(),
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1.0, 0.0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                );
+              },
+              transitionDuration: const Duration(milliseconds: 500),
+            ),
+          );
+        }
+      } else {
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to save profile. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 

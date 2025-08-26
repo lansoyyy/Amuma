@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:amuma/utils/colors.dart';
 import 'package:amuma/widgets/text_widget.dart';
 import 'package:amuma/widgets/button_widget.dart';
+import 'package:amuma/widgets/forgot_password_dialog.dart';
 import 'package:amuma/screens/dashboard_screen.dart';
 import 'package:amuma/screens/profile_setup_screen.dart';
+import 'package:amuma/services/auth_service.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -46,32 +48,107 @@ class _AuthScreenState extends State<AuthScreen> {
       _isLoading = true;
     });
 
-    // Simulate authentication delay
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      AuthResult result;
 
-    setState(() {
-      _isLoading = false;
-    });
+      if (_isLogin) {
+        // Sign in
+        result = await AuthService().signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+      } else {
+        // Sign up
+        result = await AuthService().signUpWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          name: _nameController.text.trim(),
+        );
+      }
 
-    // Navigate to appropriate screen based on auth type
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              _isLogin ? const DashboardScreen() : const ProfileSetupScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
+      if (mounted) {
+        if (result.isSuccess) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.message),
+              backgroundColor: healthGreen,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+
+          // Navigate to appropriate screen
+          if (_isLogin) {
+            // Check if profile is complete
+            final isProfileComplete = await AuthService().isProfileComplete();
+            Navigator.pushReplacement(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                    isProfileComplete
+                        ? const DashboardScreen()
+                        : const ProfileSetupScreen(),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(1.0, 0.0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 500),
+              ),
             );
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
+          } else {
+            // New user goes to profile setup
+            Navigator.pushReplacement(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) =>
+                    const ProfileSetupScreen(),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(1.0, 0.0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 500),
+              ),
+            );
+          }
+        } else {
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.message),
+              backgroundColor: healthRed,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An unexpected error occurred: ${e.toString()}'),
+            backgroundColor: healthRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -162,16 +239,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
                 // Toggle Auth Mode
                 _buildToggleSection(),
-
-                const SizedBox(height: 32),
-
-                // Divider
-                _buildDivider(),
-
-                const SizedBox(height: 24),
-
-                // Social Login Options
-                _buildSocialLogin(),
 
                 const SizedBox(height: 40),
               ],
@@ -310,12 +377,7 @@ class _AuthScreenState extends State<AuthScreen> {
             alignment: Alignment.centerRight,
             child: GestureDetector(
               onTap: () {
-                // Handle forgot password
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Forgot password feature coming soon!'),
-                  ),
-                );
+                showForgotPasswordDialog(context);
               },
               child: TextWidget(
                 text: 'Forgot Password?',
@@ -405,95 +467,6 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildDivider() {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 1,
-            color: textLight.withOpacity(0.3),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: TextWidget(
-            text: 'or continue with',
-            fontSize: 12,
-            color: textLight,
-            fontFamily: 'Regular',
-          ),
-        ),
-        Expanded(
-          child: Container(
-            height: 1,
-            color: textLight.withOpacity(0.3),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSocialLogin() {
-    return Column(
-      children: [
-        _buildSocialButton(
-          'Continue with Google',
-          Icons.g_mobiledata,
-          Colors.red,
-          () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Google sign-in coming soon!'),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        _buildSocialButton(
-          'Continue with Facebook',
-          Icons.facebook,
-          Colors.blue,
-          () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Facebook sign-in coming soon!'),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSocialButton(
-      String label, IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        height: 56,
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(width: 12),
-            TextWidget(
-              text: label,
-              fontSize: 16,
-              color: textPrimary,
-              fontFamily: 'Medium',
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

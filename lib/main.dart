@@ -1,6 +1,9 @@
 import 'package:amuma/firebase_options.dart';
 import 'package:amuma/screens/splash_screen.dart';
+import 'package:amuma/screens/dashboard_screen.dart';
+import 'package:amuma/screens/profile_setup_screen.dart';
 import 'package:amuma/services/local_storage_service.dart';
+import 'package:amuma/services/auth_service.dart';
 import 'package:amuma/utils/colors.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -20,7 +23,6 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -58,8 +60,47 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const SplashScreen(),
+      home: const AuthStateWrapper(),
       debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class AuthStateWrapper extends StatelessWidget {
+  const AuthStateWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder(
+      stream: AuthService().authStateChanges,
+      builder: (context, snapshot) {
+        // Show splash screen while checking auth state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SplashScreen();
+        }
+
+        // User is not authenticated - show splash screen (which will navigate to onboarding/auth)
+        if (!snapshot.hasData || snapshot.data == null) {
+          return const SplashScreen();
+        }
+
+        // User is authenticated - check if profile is complete
+        return FutureBuilder<bool>(
+          future: AuthService().isProfileComplete(),
+          builder: (context, profileSnapshot) {
+            if (profileSnapshot.connectionState == ConnectionState.waiting) {
+              return const SplashScreen();
+            }
+
+            // Navigate based on profile completion status
+            if (profileSnapshot.data == true) {
+              return const DashboardScreen();
+            } else {
+              return const ProfileSetupScreen();
+            }
+          },
+        );
+      },
     );
   }
 }

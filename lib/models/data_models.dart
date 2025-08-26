@@ -347,3 +347,72 @@ class EmergencyContactModel {
     );
   }
 }
+
+// Education Content Model
+class EducationContentModel {
+  final String id;
+  final String category;
+  final String titleEn;
+  final String titleCeb;
+  final String contentEn;
+  final String contentCeb;
+  final String icon;
+  final String color;
+  final List<String>? tipsEn;
+  final List<String>? tipsCeb;
+  final int priority;
+  final DateTime createdAt;
+
+  EducationContentModel({
+    required this.id,
+    required this.category,
+    required this.titleEn,
+    required this.titleCeb,
+    required this.contentEn,
+    required this.contentCeb,
+    required this.icon,
+    required this.color,
+    this.tipsEn,
+    this.tipsCeb,
+    this.priority = 0,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'category': category,
+      'titleEn': titleEn,
+      'titleCeb': titleCeb,
+      'contentEn': contentEn,
+      'contentCeb': contentCeb,
+      'icon': icon,
+      'color': color,
+      'tipsEn': tipsEn != null ? jsonEncode(tipsEn) : null,
+      'tipsCeb': tipsCeb != null ? jsonEncode(tipsCeb) : null,
+      'priority': priority,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  factory EducationContentModel.fromMap(Map<String, dynamic> map) {
+    return EducationContentModel(
+      id: map['id'],
+      category: map['category'],
+      titleEn: map['titleEn'],
+      titleCeb: map['titleCeb'],
+      contentEn: map['contentEn'],
+      contentCeb: map['contentCeb'],
+      icon: map['icon'],
+      color: map['color'],
+      tipsEn: map['tipsEn'] != null
+          ? List<String>.from(jsonDecode(map['tipsEn']))
+          : null,
+      tipsCeb: map['tipsCeb'] != null
+          ? List<String>.from(jsonDecode(map['tipsCeb']))
+          : null,
+      priority: map['priority'] ?? 0,
+      createdAt: DateTime.parse(map['createdAt']),
+    );
+  }
+}

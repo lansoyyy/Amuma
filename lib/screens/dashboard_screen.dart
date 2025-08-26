@@ -7,6 +7,9 @@ import 'package:amuma/screens/education_screen.dart';
 import 'package:amuma/screens/emergency_profile_screen.dart';
 import 'package:amuma/screens/appointment_screen.dart';
 import 'package:amuma/screens/gamification_screen.dart';
+import 'package:amuma/services/firebase_service.dart';
+import 'package:amuma/services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -72,19 +75,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class HomeTabScreen extends StatelessWidget {
+class HomeTabScreen extends StatefulWidget {
   final Function(int) onTabSelected;
 
   const HomeTabScreen({super.key, required this.onTabSelected});
 
   @override
+  State<HomeTabScreen> createState() => _HomeTabScreenState();
+}
+
+class _HomeTabScreenState extends State<HomeTabScreen> {
+  final FirebaseService _firebaseService = FirebaseService();
+  final AuthService _authService = AuthService();
+
+  Map<String, dynamic> _dashboardData = {};
+  Map<String, dynamic> _medicationStats = {};
+  Map<String, dynamic> _userStats = {};
+  List<Map<String, dynamic>> _recentActivities = [];
+  Map<String, dynamic>? _healthTip;
+  String _userName = 'User';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+    _loadUserName();
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      final dashboardData = await _firebaseService.getDashboardData();
+      final medicationStats = await _firebaseService.getMedicationStats();
+      final userStats = await _firebaseService.getUserStats();
+      final healthTip = await _firebaseService.getHealthTipOfTheDay();
+
+      if (mounted) {
+        setState(() {
+          _dashboardData = dashboardData;
+          _medicationStats = medicationStats;
+          _userStats = userStats;
+          _healthTip = healthTip;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final user = _authService.currentUser;
+      final profile = await _firebaseService.getUserProfile();
+
+      if (mounted) {
+        setState(() {
+          _userName = profile?.name ?? user?.displayName ?? 'User';
+        });
+      }
+    } catch (e) {
+      // Use default name
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final hour = DateTime.now().hour;
-    String greeting = 'Good morning!';
-    if (hour >= 12 && hour < 17) {
-      greeting = 'Good afternoon!';
-    } else if (hour >= 17) {
-      greeting = 'Good evening!';
+    String greeting = _dashboardData['greeting'] ?? 'Good morning!';
+
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: background,
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
 
     return Scaffold(
@@ -140,7 +210,7 @@ class HomeTabScreen extends StatelessWidget {
                                 fontFamily: 'Medium',
                               ),
                               TextWidget(
-                                text: 'Welcome to Amuma',
+                                text: 'Welcome $_userName',
                                 fontSize: 20,
                                 color: textPrimary,
                                 fontFamily: 'Bold',
@@ -174,19 +244,21 @@ class HomeTabScreen extends StatelessWidget {
                           size: 24,
                         ),
                       ),
-                      // Notification Badge
-                      Positioned(
-                        right: 6,
-                        top: 6,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: healthRed,
-                            borderRadius: BorderRadius.circular(4),
+                      // Notification Badge (show if there are pending tasks)
+                      if ((_medicationStats['totalDoses'] ?? 0) >
+                          (_medicationStats['completedDoses'] ?? 0))
+                        Positioned(
+                          right: 6,
+                          top: 6,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: healthRed,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ],
@@ -260,7 +332,9 @@ class HomeTabScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: _buildQuickStat(
-                              '7', 'Day Streak', Icons.local_fire_department),
+                              (_userStats['totalStreak'] ?? 0).toString(),
+                              'Day Streak',
+                              Icons.local_fire_department),
                         ),
                         Container(
                           width: 1,
@@ -269,7 +343,9 @@ class HomeTabScreen extends StatelessWidget {
                         ),
                         Expanded(
                           child: _buildQuickStat(
-                              '85', 'Health Score', Icons.trending_up),
+                              (_userStats['healthScore'] ?? 0).toString(),
+                              'Health Score',
+                              Icons.trending_up),
                         ),
                         Container(
                           width: 1,
@@ -278,7 +354,9 @@ class HomeTabScreen extends StatelessWidget {
                         ),
                         Expanded(
                           child: _buildQuickStat(
-                              '12', 'Goals Met', Icons.emoji_events),
+                              (_userStats['earnedBadges'] ?? 0).toString(),
+                              'Goals Met',
+                              Icons.emoji_events),
                         ),
                       ],
                     ),
@@ -338,22 +416,25 @@ class HomeTabScreen extends StatelessWidget {
                   Expanded(
                     child: _buildHealthSummaryCard(
                       'Medications',
-                      '2/3',
+                      '${_medicationStats['completedDoses'] ?? 0}/${_medicationStats['totalDoses'] ?? 0}',
                       'taken today',
                       Icons.medication,
                       primary,
-                      0.67,
+                      (_medicationStats['totalDoses'] ?? 0) > 0
+                          ? (_medicationStats['completedDoses'] ?? 0) /
+                              (_medicationStats['totalDoses'] ?? 1)
+                          : 0.0,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildHealthSummaryCard(
                       'Health Score',
-                      '85',
+                      (_userStats['healthScore'] ?? 0).toString(),
                       'points',
                       Icons.trending_up,
                       healthGreen,
-                      0.85,
+                      (_userStats['healthScore'] ?? 0) / 100,
                     ),
                   ),
                 ],
@@ -378,47 +459,63 @@ class HomeTabScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // Recent Activity Cards
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: primary.withOpacity(0.1)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    _buildActivityItem(
-                      'Medication taken',
-                      'Paracetamol 500mg',
-                      '30 minutes ago',
-                      Icons.medication,
-                      healthGreen,
-                    ),
-                    const Divider(height: 24),
-                    _buildActivityItem(
-                      'Health data logged',
-                      'Blood pressure: 120/80',
-                      '2 hours ago',
-                      Icons.favorite,
-                      accent,
-                    ),
-                    const Divider(height: 24),
-                    _buildActivityItem(
-                      'Appointment reminder',
-                      'Dr. Santos - Tomorrow 2PM',
-                      '4 hours ago',
-                      Icons.calendar_today,
-                      primary,
-                    ),
-                  ],
-                ),
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: _firebaseService.getRecentActivities(limit: 3),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: primary.withOpacity(0.1)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: _buildActivityList(snapshot.data!),
+                      ),
+                    );
+                  } else {
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: primary.withOpacity(0.1)),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.history,
+                            color: textSecondary,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 8),
+                          TextWidget(
+                            text: 'No recent activity',
+                            fontSize: 14,
+                            color: textSecondary,
+                            fontFamily: 'Medium',
+                          ),
+                          const SizedBox(height: 4),
+                          TextWidget(
+                            text:
+                                'Start logging your medications and health data',
+                            fontSize: 12,
+                            color: textLight,
+                            fontFamily: 'Regular',
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
               ),
 
               const SizedBox(height: 24),
@@ -467,7 +564,7 @@ class HomeTabScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     TextWidget(
-                      text:
+                      text: _healthTip?['content'] ??
                           'Drink at least 8 glasses of water daily to stay hydrated and maintain optimal body function.',
                       fontSize: 14,
                       color: textSecondary,
@@ -621,7 +718,7 @@ class HomeTabScreen extends StatelessWidget {
   }
 
   void _navigateToTab(BuildContext context, int index) {
-    onTabSelected(index);
+    widget.onTabSelected(index);
   }
 
   void _showAppointments(BuildContext context) {
@@ -636,6 +733,80 @@ class HomeTabScreen extends StatelessWidget {
       context,
       MaterialPageRoute(builder: (context) => const GamificationScreen()),
     );
+  }
+
+  List<Widget> _buildActivityList(List<Map<String, dynamic>> activities) {
+    List<Widget> widgets = [];
+
+    for (int i = 0; i < activities.length; i++) {
+      final activity = activities[i];
+
+      // Parse activity data
+      String title = activity['type'] ?? 'Activity';
+      String description = activity['description'] ?? '';
+      String timeAgo = _getTimeAgo(activity['timestamp']);
+
+      // Determine icon and color based on activity type
+      IconData icon;
+      Color color;
+
+      switch (activity['type']) {
+        case 'medication':
+          icon = Icons.medication;
+          color = healthGreen;
+          break;
+        case 'health_entry':
+          icon = Icons.favorite;
+          color = accent;
+          break;
+        case 'appointment':
+          icon = Icons.calendar_today;
+          color = primary;
+          break;
+        default:
+          icon = Icons.info;
+          color = textSecondary;
+      }
+
+      widgets.add(_buildActivityItem(title, description, timeAgo, icon, color));
+
+      // Add divider between items (except for the last item)
+      if (i < activities.length - 1) {
+        widgets.add(const Divider(height: 24));
+      }
+    }
+
+    return widgets;
+  }
+
+  String _getTimeAgo(dynamic timestamp) {
+    if (timestamp == null) return 'Unknown time';
+
+    try {
+      DateTime activityTime;
+      if (timestamp is Timestamp) {
+        activityTime = timestamp.toDate();
+      } else {
+        activityTime = DateTime.parse(timestamp.toString());
+      }
+
+      final now = DateTime.now();
+      final difference = now.difference(activityTime);
+
+      if (difference.inMinutes < 1) {
+        return 'Just now';
+      } else if (difference.inMinutes < 60) {
+        return '${difference.inMinutes} minutes ago';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours} hours ago';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays} days ago';
+      } else {
+        return 'More than a week ago';
+      }
+    } catch (e) {
+      return 'Unknown time';
+    }
   }
 
   Widget _buildHealthSummaryCard(

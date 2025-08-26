@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:amuma/utils/colors.dart';
 import 'package:amuma/widgets/text_widget.dart';
+import 'package:amuma/services/firebase_service.dart';
+import 'package:amuma/models/data_models.dart';
 
 class EducationScreen extends StatefulWidget {
   const EducationScreen({super.key});
@@ -10,6 +12,7 @@ class EducationScreen extends StatefulWidget {
 }
 
 class _EducationScreenState extends State<EducationScreen> {
+  final FirebaseService _firebaseService = FirebaseService();
   String currentLanguage = 'EN';
   int selectedCategory = 0;
 
@@ -97,7 +100,84 @@ class _EducationScreenState extends State<EducationScreen> {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _buildCategoryContent(),
+              child: StreamBuilder<List<EducationContentModel>>(
+                stream: _firebaseService.getEducationContent(
+                  category: _getCategoryKey(selectedCategory),
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline, color: healthRed, size: 48),
+                          const SizedBox(height: 16),
+                          TextWidget(
+                            text: 'Error loading content',
+                            fontSize: 16,
+                            color: healthRed,
+                            fontFamily: 'Bold',
+                          ),
+                          const SizedBox(height: 8),
+                          TextWidget(
+                            text: 'Please check your connection and try again',
+                            fontSize: 12,
+                            color: textGrey,
+                            fontFamily: 'Regular',
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final contents = snapshot.data ?? [];
+
+                  if (contents.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.library_books_outlined,
+                              color: textGrey, size: 48),
+                          const SizedBox(height: 16),
+                          TextWidget(
+                            text: currentLanguage == 'EN'
+                                ? 'No content available'
+                                : 'Walay sulod nga makita',
+                            fontSize: 16,
+                            color: textGrey,
+                            fontFamily: 'Bold',
+                          ),
+                          const SizedBox(height: 8),
+                          TextWidget(
+                            text: currentLanguage == 'EN'
+                                ? 'Content for this category will be available soon'
+                                : 'Ang sulod para niini nga kategorya ania na soon',
+                            fontSize: 12,
+                            color: textGrey,
+                            fontFamily: 'Regular',
+                            align: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    itemCount: contents.length,
+                    itemBuilder: (context, index) {
+                      final content = contents[index];
+                      return _buildContentCard(content);
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ],
@@ -105,269 +185,40 @@ class _EducationScreenState extends State<EducationScreen> {
     );
   }
 
-  Widget _buildCategoryContent() {
-    switch (selectedCategory) {
+  String _getCategoryKey(int index) {
+    switch (index) {
       case 0:
-        return _buildDietaryTips();
+        return 'dietary_tips';
       case 1:
-        return _buildDiabetesContent();
+        return 'diabetes';
       case 2:
-        return _buildHypertensionContent();
+        return 'hypertension';
       case 3:
-        return _buildHeartHealthContent();
+        return 'heart_health';
       case 4:
-        return _buildKidneyCareContent();
+        return 'kidney_care';
       default:
-        return _buildDietaryTips();
+        return 'dietary_tips';
     }
   }
 
-  Widget _buildDietaryTips() {
-    final tips = currentLanguage == 'EN'
-        ? _getEnglishDietaryTips()
-        : _getCebuanoDietaryTips();
+  Widget _buildContentCard(EducationContentModel content) {
+    final title = currentLanguage == 'EN' ? content.titleEn : content.titleCeb;
+    final description =
+        currentLanguage == 'EN' ? content.contentEn : content.contentCeb;
+    final tips = currentLanguage == 'EN' ? content.tipsEn : content.tipsCeb;
 
-    return ListView(
-      children: [
-        _buildSectionHeader(currentLanguage == 'EN'
-            ? 'Filipino Foods for Better Health'
-            : 'Mga Pagkaon nga Maayo para sa Panglawas'),
-
-        const SizedBox(height: 16),
-
-        // Recommended Foods
-        _buildTipCard(
-          currentLanguage == 'EN'
-              ? 'Recommended Foods'
-              : 'Girekomenda nga Pagkaon',
-          tips['recommended']!,
-          Colors.green.shade400,
-          Icons.thumb_up,
-        ),
-
-        const SizedBox(height: 16),
-
-        // Foods to Limit
-        _buildTipCard(
-          currentLanguage == 'EN' ? 'Foods to Limit' : 'Pagkaon nga Limitahan',
-          tips['restricted']!,
-          Colors.orange.shade400,
-          Icons.warning,
-        ),
-
-        const SizedBox(height: 16),
-
-        // Budget-Friendly Tips
-        _buildTipCard(
-          currentLanguage == 'EN'
-              ? 'Budget-Friendly Tips'
-              : 'Tips para sa Budget',
-          tips['budget']!,
-          Colors.blue.shade400,
-          Icons.savings,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDiabetesContent() {
-    return ListView(
-      children: [
-        _buildSectionHeader(currentLanguage == 'EN'
-            ? 'Managing Diabetes'
-            : 'Pagdumala sa Diabetes'),
-        const SizedBox(height: 16),
-        _buildEducationModule(
-          currentLanguage == 'EN'
-              ? 'Blood Sugar Monitoring'
-              : 'Pagsubaybay sa Blood Sugar',
-          currentLanguage == 'EN'
-              ? 'Check your blood sugar regularly as advised by your doctor. Keep a log of your readings.'
-              : 'Susiha ang imong blood sugar kanunay sama sa gisugo sa doctor. Ihot ang imong mga reading.',
-          Icons.bloodtype,
-          Colors.red.shade400,
-        ),
-        _buildEducationModule(
-          currentLanguage == 'EN' ? 'Healthy Eating' : 'Linom nga Pagkaon',
-          currentLanguage == 'EN'
-              ? 'Choose whole grains, vegetables, and lean proteins. Limit sugary foods and drinks.'
-              : 'Pilia ang whole grains, utanon, ug lean proteins. Limitahi ang mga tam-is nga pagkaon.',
-          Icons.restaurant,
-          Colors.green.shade400,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHypertensionContent() {
-    return ListView(
-      children: [
-        _buildSectionHeader(currentLanguage == 'EN'
-            ? 'Managing High Blood Pressure'
-            : 'Pagdumala sa Taas nga Presyon'),
-        const SizedBox(height: 16),
-        _buildEducationModule(
-          currentLanguage == 'EN' ? 'Reduce Sodium' : 'Pakunhura ang Asin',
-          currentLanguage == 'EN'
-              ? 'Limit salt and processed foods. Use herbs and spices for flavor instead.'
-              : 'Limitahi ang asin ug processed foods. Gamita ang herbs ug spices para sa lami.',
-          Icons.no_food,
-          Colors.orange.shade400,
-        ),
-        _buildEducationModule(
-          currentLanguage == 'EN' ? 'Stay Active' : 'Mag-exercise',
-          currentLanguage == 'EN'
-              ? 'Regular physical activity helps lower blood pressure. Try walking for 30 minutes daily.'
-              : 'Ang regular nga exercise makatabang sa pagkunhod sa presyon. Sulayi ang paglakaw og 30 minutos.',
-          Icons.directions_walk,
-          Colors.blue.shade400,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeartHealthContent() {
-    return ListView(
-      children: [
-        _buildSectionHeader(currentLanguage == 'EN'
-            ? 'Heart Health Tips'
-            : 'Tips para sa Kasingkasing'),
-        const SizedBox(height: 16),
-        _buildEducationModule(
-          currentLanguage == 'EN' ? 'Healthy Fats' : 'Linom nga Tambok',
-          currentLanguage == 'EN'
-              ? 'Choose fish, nuts, and olive oil. Avoid trans fats and limit saturated fats.'
-              : 'Pilia ang isda, nuts, ug olive oil. Likayi ang trans fats ug limitahi ang saturated fats.',
-          Icons.set_meal,
-          Colors.pink.shade400,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildKidneyCareContent() {
-    return ListView(
-      children: [
-        _buildSectionHeader(
-            currentLanguage == 'EN' ? 'Kidney Care' : 'Pag-atiman sa Kidney'),
-        const SizedBox(height: 16),
-        _buildEducationModule(
-          currentLanguage == 'EN' ? 'Stay Hydrated' : 'Mag-inom og Tubig',
-          currentLanguage == 'EN'
-              ? 'Drink plenty of water daily. Limit sugary drinks and alcohol.'
-              : 'Mag-inom og daghang tubig kada adlaw. Limitahi ang tam-is nga ilimnon ug alkohol.',
-          Icons.water_drop,
-          Colors.cyan.shade400,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [primary, primary.withOpacity(0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TextWidget(
-        text: title,
-        fontSize: 18,
-        color: buttonText,
-        fontFamily: 'Bold',
-      ),
-    );
-  }
-
-  Widget _buildTipCard(
-      String title, List<String> tips, Color color, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextWidget(
-                  text: title,
-                  fontSize: 16,
-                  color: textLight,
-                  fontFamily: 'Bold',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...tips
-              .map((tip) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          margin: const EdgeInsets.only(top: 6, right: 8),
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        Expanded(
-                          child: TextWidget(
-                            text: tip,
-                            fontSize: 14,
-                            color: textLight,
-                            fontFamily: 'Regular',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ))
-              .toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEducationModule(
-      String title, String content, IconData icon, Color color) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border:
+            Border.all(color: _getContentColor(content.color).withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: _getContentColor(content.color).withOpacity(0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -381,10 +232,14 @@ class _EducationScreenState extends State<EducationScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: _getContentColor(content.color).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(
+                  _getContentIcon(content.icon),
+                  color: _getContentColor(content.color),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -399,72 +254,96 @@ class _EducationScreenState extends State<EducationScreen> {
           ),
           const SizedBox(height: 12),
           TextWidget(
-            text: content,
+            text: description,
             fontSize: 14,
             color: textGrey,
             fontFamily: 'Regular',
           ),
+          if (tips != null && tips.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...tips.map((tip) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        margin: const EdgeInsets.only(top: 6, right: 8),
+                        decoration: BoxDecoration(
+                          color: _getContentColor(content.color),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Expanded(
+                        child: TextWidget(
+                          text: tip,
+                          fontSize: 14,
+                          color: textLight,
+                          fontFamily: 'Regular',
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+          ],
         ],
       ),
     );
   }
 
-  Map<String, List<String>> _getEnglishDietaryTips() {
-    return {
-      'recommended': [
-        'Brown rice (bigas nga brown) - better than white rice',
-        'Fresh vegetables - malunggay, kangkong, ampalaya',
-        'Fresh fruits - banana, papaya, guava',
-        'Fish - bangus, tilapia, tuna',
-        'Lean meats - chicken breast without skin',
-        'Legumes - mongo, sitaw, patani',
-      ],
-      'restricted': [
-        'Lechon and other fatty pork dishes',
-        'Processed meats - hotdog, spam, tocino',
-        'Fried foods - pritong manok, lumpia',
-        'Sweet desserts - halo-halo, leche flan',
-        'Sugary drinks - softdrinks, sweet iced tea',
-        'Excessive white rice consumption',
-      ],
-      'budget': [
-        'Buy vegetables from local markets (cheaper than malls)',
-        'Choose seasonal fruits and vegetables',
-        'Cook more fish than meat (often cheaper)',
-        'Grow your own herbs - luya, tanglad, dahon ng sili',
-        'Buy rice in bulk to save money',
-        'Use less oil when cooking to save and be healthier',
-      ],
-    };
+  Color _getContentColor(String colorName) {
+    switch (colorName.toLowerCase()) {
+      case 'green':
+        return Colors.green.shade400;
+      case 'orange':
+        return Colors.orange.shade400;
+      case 'blue':
+        return Colors.blue.shade400;
+      case 'red':
+        return Colors.red.shade400;
+      case 'pink':
+        return Colors.pink.shade400;
+      case 'cyan':
+        return Colors.cyan.shade400;
+      case 'purple':
+        return Colors.purple.shade400;
+      case 'teal':
+        return Colors.teal.shade400;
+      default:
+        return primary;
+    }
   }
 
-  Map<String, List<String>> _getCebuanoDietaryTips() {
-    return {
-      'recommended': [
-        'Brown rice - mas maayo kay sa puti nga bugas',
-        'Presko nga utanon - malunggay, kangkong, ampalaya',
-        'Presko nga prutas - saging, papaya, bayabas',
-        'Isda - bangus, tilapia, tuna',
-        'Lean nga karne - puso sa manok nga walay panit',
-        'Legumes - monggo, sitaw, patani',
-      ],
-      'restricted': [
-        'Lechon ug uban pang tambok nga baboy',
-        'Processed nga karne - hotdog, spam, tocino',
-        'Mga pritong pagkaon - pritong manok, lumpia',
-        'Tam-is nga dessert - halo-halo, leche flan',
-        'Tam-is nga ilimnon - softdrinks, tam-is nga tea',
-        'Sobrang pagkaon og puti nga bugas',
-      ],
-      'budget': [
-        'Palit og utanon sa merkado (mas barato kay sa mall)',
-        'Pilia ang seasonal nga prutas ug utanon',
-        'Luto og mas daghang isda kay sa karne',
-        'Tanum og kaugalingon nga herbs - luya, tanglad',
-        'Palit og bugas nga dako para makatipid',
-        'Gamita og dyutay nga mantika sa pagluto',
-      ],
-    };
+  IconData _getContentIcon(String iconName) {
+    switch (iconName.toLowerCase()) {
+      case 'thumb_up':
+        return Icons.thumb_up;
+      case 'warning':
+        return Icons.warning;
+      case 'savings':
+        return Icons.savings;
+      case 'bloodtype':
+        return Icons.bloodtype;
+      case 'restaurant':
+        return Icons.restaurant;
+      case 'no_food':
+        return Icons.no_food;
+      case 'directions_walk':
+        return Icons.directions_walk;
+      case 'set_meal':
+        return Icons.set_meal;
+      case 'water_drop':
+        return Icons.water_drop;
+      case 'health_and_safety':
+        return Icons.health_and_safety;
+      case 'favorite':
+        return Icons.favorite;
+      case 'medical_services':
+        return Icons.medical_services;
+      default:
+        return Icons.info;
+    }
   }
 
   String _translateCategory(String category) {
