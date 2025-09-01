@@ -135,26 +135,11 @@ class _SplashScreenState extends State<SplashScreen>
                     scale: _logoScaleAnimation.value,
                     child: Opacity(
                       opacity: _logoOpacityAnimation.value,
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: accent,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: accent.withOpacity(0.4),
-                              blurRadius: 30,
-                              offset: const Offset(0, 10),
-                              spreadRadius: 5,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.favorite,
-                          color: white,
-                          size: 60,
-                        ),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 250,
+                        height: 250,
+                        color: Colors.white,
                       ),
                     ),
                   );

@@ -8,6 +8,7 @@ import 'package:amuma/screens/emergency_profile_screen.dart';
 import 'package:amuma/screens/appointment_screen.dart';
 import 'package:amuma/screens/gamification_screen.dart';
 import 'package:amuma/screens/notification_screen.dart';
+import 'package:amuma/screens/faq_screen.dart';
 import 'package:amuma/services/firebase_service.dart';
 import 'package:amuma/services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -674,6 +675,13 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                     healthYellow,
                     () => _showStreakTracker(context),
                   ),
+                  _buildEnhancedQuickActionCard(
+                    'FAQ',
+                    'Frequently asked questions',
+                    Icons.help_outline,
+                    primary,
+                    () => _showFAQ(context),
+                  ),
                 ],
               ),
             ],
@@ -1051,6 +1059,13 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
           fontFamily: 'Regular',
         ),
       ],
+    );
+  }
+
+  void _showFAQ(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const FAQScreen()),
     );
   }
 }
