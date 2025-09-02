@@ -9,7 +9,7 @@ class FAQScreen extends StatefulWidget {
   State<FAQScreen> createState() => _FAQScreenState();
 }
 
-class _FAQScreenState extends State<FAQScreen> {
+class _FAQScreenState extends State<FAQScreen> with TickerProviderStateMixin {
   // Sample FAQ data - this can be replaced with actual data from a service
   final List<Map<String, String>> _faqData = [
     {
@@ -54,6 +54,39 @@ class _FAQScreenState extends State<FAQScreen> {
     },
   ];
 
+  late AnimationController _mascotController;
+  late Animation<double> _bounceAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _initMascotAnimation();
+  }
+
+  void _initMascotAnimation() {
+    _mascotController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+
+    _bounceAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _mascotController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Repeat the animation indefinitely
+    _mascotController.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _mascotController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -74,16 +107,24 @@ class _FAQScreenState extends State<FAQScreen> {
         ),
       ),
       body: SafeArea(
-        child: ListView.builder(
-          padding: const EdgeInsets.all(20),
-          itemCount: _faqData.length,
-          itemBuilder: (context, index) {
-            return _buildFAQItem(
-              _faqData[index]['question']!,
-              _faqData[index]['answer']!,
-              index,
-            );
-          },
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(20),
+                itemCount: _faqData.length,
+                itemBuilder: (context, index) {
+                  return _buildFAQItem(
+                    _faqData[index]['question']!,
+                    _faqData[index]['answer']!,
+                    index,
+                  );
+                },
+              ),
+            ),
+            // Mascot with animation
+            _buildAnimatedMascot(),
+          ],
         ),
       ),
     );
@@ -127,6 +168,49 @@ class _FAQScreenState extends State<FAQScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedMascot() {
+    return Container(
+      height: 120,
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AnimatedBuilder(
+            animation: _mascotController,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(0, 10 * (1 - _bounceAnimation.value)),
+                child: Image.asset(
+                  'assets/images/nurse.png',
+                  width: 80,
+                  height: 80,
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 16),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextWidget(
+                text: 'Need more help?',
+                fontSize: 14,
+                color: textPrimary,
+                fontFamily: 'Medium',
+              ),
+              TextWidget(
+                text: 'Check out our health resources!',
+                fontSize: 14,
+                color: textPrimary,
+                fontFamily: 'Medium',
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
