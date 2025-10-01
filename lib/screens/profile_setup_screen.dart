@@ -4,6 +4,7 @@ import 'package:amuma/widgets/text_widget.dart';
 import 'package:amuma/widgets/button_widget.dart';
 import 'package:amuma/screens/dashboard_screen.dart';
 import 'package:amuma/services/auth_service.dart';
+import 'package:amuma/widgets/logout_widget.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -274,7 +275,22 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
               const Spacer(),
 
-              const SizedBox(width: 32),
+              // Logout Button
+              GestureDetector(
+                onTap: () => LogoutWidget.showLogoutDialog(context),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: healthRed.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.logout,
+                    color: healthRed,
+                    size: 16,
+                  ),
+                ),
+              ),
             ],
           ),
 

@@ -507,6 +507,7 @@ class _EmergencyProfileScreenState extends State<EmergencyProfileScreen> {
       {'name': 'DOH Hotline', 'number': '1555'},
       {'name': 'Red Cross', 'number': '143'},
       {'name': 'NDRRMC', 'number': '(02) 8911-1406'},
+      {'name': 'Health Center', 'number': '2537734'},
     ];
 
     return Container(

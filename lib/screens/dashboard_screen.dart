@@ -11,6 +11,8 @@ import 'package:amuma/screens/notification_screen.dart';
 import 'package:amuma/screens/faq_screen.dart';
 import 'package:amuma/services/firebase_service.dart';
 import 'package:amuma/services/auth_service.dart';
+import 'package:amuma/widgets/logout_widget.dart';
+import 'package:amuma/screens/user_profile_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -174,29 +176,67 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                   Expanded(
                     child: Row(
                       children: [
-                        // User Avatar
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [accent, accentDark],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(25),
-                            boxShadow: [
-                              BoxShadow(
-                                color: accent.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
+                        // User Avatar (now clickable)
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const UserProfileScreen(),
                               ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.person,
-                            color: white,
-                            size: 24,
+                            );
+                          },
+                          child: FutureBuilder<Map<String, dynamic>?>(
+                            future: _authService.getUserData(),
+                            builder: (context, snapshot) {
+                              String? profileImageUrl =
+                                  snapshot.data?['profileImageUrl'];
+
+                              return Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  gradient: profileImageUrl == null
+                                      ? LinearGradient(
+                                          colors: [accent, accentDark],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        )
+                                      : null,
+                                  borderRadius: BorderRadius.circular(25),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: accent.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(25),
+                                  child: profileImageUrl != null
+                                      ? Image.network(
+                                          profileImageUrl,
+                                          width: 50,
+                                          height: 50,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                            return const Icon(
+                                              Icons.person,
+                                              color: white,
+                                              size: 24,
+                                            );
+                                          },
+                                        )
+                                      : const Icon(
+                                          Icons.person,
+                                          color: white,
+                                          size: 24,
+                                        ),
+                                ),
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -212,7 +252,7 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                                 fontFamily: 'Medium',
                               ),
                               TextWidget(
-                                text: 'Welcome $_userName',
+                                text: 'Welcome ${_userName.split(' ')[0]}',
                                 fontSize: 20,
                                 color: textPrimary,
                                 fontFamily: 'Bold',
@@ -682,6 +722,13 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
                     primary,
                     () => _showFAQ(context),
                   ),
+                  _buildEnhancedQuickActionCard(
+                    'My Profile',
+                    'View and edit profile',
+                    Icons.person,
+                    accent,
+                    () => _showProfile(context),
+                  ),
                 ],
               ),
             ],
@@ -1066,6 +1113,13 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const FAQScreen()),
+    );
+  }
+
+  void _showProfile(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const UserProfileScreen()),
     );
   }
 }

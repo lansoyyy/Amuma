@@ -6,6 +6,7 @@ import 'package:amuma/widgets/forgot_password_dialog.dart';
 import 'package:amuma/screens/dashboard_screen.dart';
 import 'package:amuma/screens/profile_setup_screen.dart';
 import 'package:amuma/services/auth_service.dart';
+import 'package:amuma/widgets/logout_widget.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -30,6 +31,9 @@ class _AuthScreenState extends State<AuthScreen> {
   // Form keys
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
+  // Terms and privacy
+  bool _agreeToTerms = false;
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +47,19 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _handleAuth() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Check if user agreed to terms for signup
+    if (!_isLogin && !_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'You must agree to the Terms and Privacy Policy to create an account'),
+          backgroundColor: healthRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -240,7 +257,42 @@ class _AuthScreenState extends State<AuthScreen> {
                 // Toggle Auth Mode
                 _buildToggleSection(),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
+
+                // Logout option (for users who are logged in but reached this screen)
+                if (AuthService().isLoggedIn)
+                  Center(
+                    child: GestureDetector(
+                      onTap: () => LogoutWidget.showLogoutDialog(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: healthRed.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.logout,
+                              color: healthRed,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            TextWidget(
+                              text: 'Logout',
+                              fontSize: 14,
+                              color: healthRed,
+                              fontFamily: 'Medium',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -369,6 +421,12 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           ),
         ],
+
+        // Terms and Privacy (only for signup)
+        if (!_isLogin) ...[
+          const SizedBox(height: 16),
+          _buildTermsAndPrivacy(),
+        ],
       ],
     );
   }
@@ -448,6 +506,255 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTermsAndPrivacy() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: primary.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _agreeToTerms = !_agreeToTerms;
+                  });
+                },
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  margin: const EdgeInsets.only(top: 2),
+                  decoration: BoxDecoration(
+                    color: _agreeToTerms ? primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: _agreeToTerms ? primary : textSecondary,
+                      width: 2,
+                    ),
+                  ),
+                  child: _agreeToTerms
+                      ? const Icon(
+                          Icons.check,
+                          color: white,
+                          size: 14,
+                        )
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      text: 'I agree to the',
+                      fontSize: 14,
+                      color: textPrimary,
+                      fontFamily: 'Regular',
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () =>
+                              _showTermsAndPrivacyDialog('Terms of Service'),
+                          child: TextWidget(
+                            text: 'Terms of Service',
+                            fontSize: 14,
+                            color: primary,
+                            fontFamily: 'Medium',
+                          ),
+                        ),
+                        TextWidget(
+                          text: ' and ',
+                          fontSize: 14,
+                          color: textPrimary,
+                          fontFamily: 'Regular',
+                        ),
+                        GestureDetector(
+                          onTap: () =>
+                              _showTermsAndPrivacyDialog('Privacy Policy'),
+                          child: TextWidget(
+                            text: 'Privacy Policy',
+                            fontSize: 14,
+                            color: primary,
+                            fontFamily: 'Medium',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    TextWidget(
+                      text:
+                          'governed by the Data Privacy Act of 2012 (Republic Act No. 10173)',
+                      fontSize: 12,
+                      color: textSecondary,
+                      fontFamily: 'Regular',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTermsAndPrivacyDialog(String title) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: TextWidget(
+          text: title,
+          fontSize: 18,
+          color: textPrimary,
+          fontFamily: 'Bold',
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (title == 'Terms of Service') ...[
+                _buildTermsContent(),
+              ] else ...[
+                _buildPrivacyContent(),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: TextWidget(
+              text: 'Close',
+              fontSize: 14,
+              color: primary,
+              fontFamily: 'Medium',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTermsContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextWidget(
+          text: 'Amuma Health App Terms of Service',
+          fontSize: 16,
+          color: textPrimary,
+          fontFamily: 'Bold',
+        ),
+        const SizedBox(height: 12),
+        TextWidget(
+          text: 'Last updated: October 2023',
+          fontSize: 12,
+          color: textSecondary,
+          fontFamily: 'Regular',
+        ),
+        const SizedBox(height: 16),
+        _buildSectionTitle('1. Acceptance of Terms'),
+        _buildSectionText(
+            'By accessing and using the Amuma Health App, you accept and agree to be bound by the terms and provision of this agreement.'),
+        _buildSectionTitle('2. Use License'),
+        _buildSectionText(
+            'Permission is granted to temporarily download one copy of Amuma Health App per device for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title.'),
+        _buildSectionTitle('3. Disclaimer'),
+        _buildSectionText(
+            'The information on this app is provided on an as is basis. To the fullest extent permitted by law, this Company excludes all representations and warranties relating to this app.'),
+        _buildSectionTitle('4. Health Information'),
+        _buildSectionText(
+            'Amuma is designed to help you track your health information and medication adherence. This app is not a substitute for professional medical advice, diagnosis, or treatment.'),
+        _buildSectionTitle('5. User Responsibilities'),
+        _buildSectionText(
+            'You are responsible for maintaining the confidentiality of your account and password. You agree to accept responsibility for all activities that occur under your account or password.'),
+        _buildSectionTitle('6. Governing Law'),
+        _buildSectionText(
+            'These terms and conditions are governed by and construed in accordance with the laws of the Philippines and you irrevocably submit to the exclusive jurisdiction of the courts in that State or location.'),
+      ],
+    );
+  }
+
+  Widget _buildPrivacyContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextWidget(
+          text: 'Amuma Health App Privacy Policy',
+          fontSize: 16,
+          color: textPrimary,
+          fontFamily: 'Bold',
+        ),
+        const SizedBox(height: 12),
+        TextWidget(
+          text: 'Last updated: October 2023',
+          fontSize: 12,
+          color: textSecondary,
+          fontFamily: 'Regular',
+        ),
+        const SizedBox(height: 16),
+        _buildSectionTitle('Data Privacy Act of 2012 Compliance'),
+        _buildSectionText(
+            'This Privacy Policy is compliant with the Data Privacy Act of 2012 (Republic Act No. 10173) of the Philippines and its implementing rules and regulations.'),
+        _buildSectionTitle('1. Information We Collect'),
+        _buildSectionText(
+            'We collect information you provide directly to us, such as when you create an account, update your profile, or use our services. This includes personal information, health data, and usage information.'),
+        _buildSectionTitle('2. How We Use Your Information'),
+        _buildSectionText(
+            'We use the information we collect to provide, maintain, and improve our services, process transactions, communicate with you, and personalize your experience.'),
+        _buildSectionTitle('3. Information Sharing'),
+        _buildSectionText(
+            'We do not sell, trade, or otherwise transfer your personal information to third parties without your consent, except as described in this Privacy Policy or as required by law.'),
+        _buildSectionTitle('4. Data Security'),
+        _buildSectionText(
+            'We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.'),
+        _buildSectionTitle('5. Your Rights'),
+        _buildSectionText(
+            'Under the Data Privacy Act of 2012, you have the right to know, access, object, rectify, erase, or port your personal data. You may exercise these rights by contacting us.'),
+        _buildSectionTitle('6. Data Retention'),
+        _buildSectionText(
+            'We retain your personal information only as long as necessary to fulfill the purposes for which it was collected, or as required by law.'),
+        _buildSectionTitle('7. Contact Information'),
+        _buildSectionText(
+            'If you have any questions about this Privacy Policy or our data practices, please contact our Data Protection Officer at privacy@amuma.health'),
+      ],
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      child: TextWidget(
+        text: title,
+        fontSize: 14,
+        color: textPrimary,
+        fontFamily: 'Bold',
+      ),
+    );
+  }
+
+  Widget _buildSectionText(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TextWidget(
+        text: text,
+        fontSize: 13,
+        color: textSecondary,
+        fontFamily: 'Regular',
+      ),
     );
   }
 }
