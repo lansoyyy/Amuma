@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:amuma/utils/colors.dart';
 import 'package:amuma/widgets/text_widget.dart';
 import 'package:amuma/widgets/button_widget.dart';
+import 'package:amuma/widgets/medication_notification_widget.dart';
+import 'package:amuma/widgets/medication_banner_notification.dart';
 import 'package:amuma/services/firebase_service.dart';
 import 'package:amuma/models/data_models.dart';
 import 'package:intl/intl.dart';
@@ -18,6 +20,8 @@ class _MedicationScreenState extends State<MedicationScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _dosageController = TextEditingController();
   List<String> _medicationTimes = [];
+  List<MedicationModel> _medications = [];
+  bool _showBanner = true;
 
   @override
   void dispose() {
@@ -46,182 +50,249 @@ class _MedicationScreenState extends State<MedicationScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Today's Overview
-            FutureBuilder<Map<String, dynamic>>(
-              future: _firebaseService.getMedicationStats(),
-              builder: (context, snapshot) {
-                final stats = snapshot.data ?? {};
-                final taken = stats['completedDoses'] ?? 0;
-                final total = stats['totalDoses'] ?? 0;
-                final progress = total > 0 ? taken / total : 0.0;
+      body: Stack(
+        children: [
+          // Main content
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Medication Notifications
+                StreamBuilder<List<MedicationModel>>(
+                  stream: _firebaseService.getMedications(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SizedBox.shrink();
+                    }
 
-                return Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        primaryLight.withOpacity(0.3),
-                        primaryLight.withOpacity(0.1)
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: primary.withOpacity(0.3)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextWidget(
-                        text: 'Today\'s Progress',
-                        fontSize: 16,
-                        color: primary,
-                        fontFamily: 'Bold',
+                    if (snapshot.hasError || !snapshot.hasData) {
+                      return const SizedBox.shrink();
+                    }
+
+                    _medications = snapshot.data!;
+
+                    return MedicationNotificationWidget(
+                      medications: _medications,
+                      onMarkAsTaken: _markAsTaken,
+                      onDismiss: _dismissNotification,
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // Today's Overview
+                FutureBuilder<Map<String, dynamic>>(
+                  future: _firebaseService.getMedicationStats(),
+                  builder: (context, snapshot) {
+                    final stats = snapshot.data ?? {};
+                    final taken = stats['completedDoses'] ?? 0;
+                    final total = stats['totalDoses'] ?? 0;
+                    final progress = total > 0 ? taken / total : 0.0;
+
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            primaryLight.withOpacity(0.3),
+                            primaryLight.withOpacity(0.1)
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: primary.withOpacity(0.3)),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildProgressIndicator(progress),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          TextWidget(
+                            text: 'Today\'s Progress',
+                            fontSize: 16,
+                            color: primary,
+                            fontFamily: 'Bold',
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
                             children: [
-                              TextWidget(
-                                text: '$taken/$total doses taken',
-                                fontSize: 14,
-                                color: textLight,
-                                fontFamily: 'Medium',
-                              ),
-                              TextWidget(
-                                text: DateFormat('EEEE, MMM d')
-                                    .format(DateTime.now()),
-                                fontSize: 12,
-                                color: textGrey,
-                                fontFamily: 'Regular',
+                              _buildProgressIndicator(progress),
+                              const SizedBox(width: 16),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextWidget(
+                                    text: '$taken/$total doses taken',
+                                    fontSize: 14,
+                                    color: textLight,
+                                    fontFamily: 'Medium',
+                                  ),
+                                  TextWidget(
+                                    text: DateFormat('EEEE, MMM d')
+                                        .format(DateTime.now()),
+                                    fontSize: 12,
+                                    color: textGrey,
+                                    fontFamily: 'Regular',
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 24),
-
-            // Medications List
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextWidget(
-                  text: 'Today\'s Schedule',
-                  fontSize: 18,
-                  color: textLight,
-                  fontFamily: 'Bold',
+                    );
+                  },
                 ),
-                TextButton(
-                  onPressed: _showLanguageToggle,
-                  child: TextWidget(
-                    text: 'EN/CEB',
-                    fontSize: 12,
-                    color: primary,
-                    fontFamily: 'Medium',
+
+                const SizedBox(height: 24),
+
+                // Medications List
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextWidget(
+                      text: 'Today\'s Schedule',
+                      fontSize: 18,
+                      color: textLight,
+                      fontFamily: 'Bold',
+                    ),
+                    TextButton(
+                      onPressed: _showLanguageToggle,
+                      child: TextWidget(
+                        text: 'EN/CEB',
+                        fontSize: 12,
+                        color: primary,
+                        fontFamily: 'Medium',
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                Expanded(
+                  child: StreamBuilder<List<MedicationModel>>(
+                    stream: _firebaseService.getMedications(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      if (snapshot.hasError) {
+                        print(snapshot.error);
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                color: healthRed,
+                                size: 48,
+                              ),
+                              const SizedBox(height: 16),
+                              TextWidget(
+                                text: 'Error loading medications',
+                                fontSize: 16,
+                                color: textSecondary,
+                                fontFamily: 'Medium',
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      final medications = snapshot.data ?? [];
+
+                      if (medications.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.medication_outlined,
+                                color: textSecondary,
+                                size: 64,
+                              ),
+                              const SizedBox(height: 16),
+                              TextWidget(
+                                text: 'No medications added yet',
+                                fontSize: 18,
+                                color: textSecondary,
+                                fontFamily: 'Bold',
+                              ),
+                              const SizedBox(height: 8),
+                              TextWidget(
+                                text:
+                                    'Tap the + button to add your first medication',
+                                fontSize: 14,
+                                color: textLight,
+                                fontFamily: 'Regular',
+                              ),
+                              const SizedBox(height: 24),
+                              ButtonWidget(
+                                label: 'Add Medication',
+                                onPressed: _showAddMedicationDialog,
+                                color: primary,
+                                width: 200,
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        itemCount: medications.length,
+                        itemBuilder: (context, index) {
+                          return _buildMedicationCard(
+                              medications[index], index);
+                        },
+                      );
+                    },
                   ),
                 ),
               ],
             ),
+          ),
 
-            const SizedBox(height: 16),
-
-            Expanded(
+          // Banner notification overlay
+          if (_showBanner)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
               child: StreamBuilder<List<MedicationModel>>(
                 stream: _firebaseService.getMedications(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                  if (snapshot.connectionState == ConnectionState.waiting ||
+                      snapshot.hasError ||
+                      !snapshot.hasData) {
+                    return const SizedBox.shrink();
                   }
 
-                  if (snapshot.hasError) {
-                    print(snapshot.error);
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            color: healthRed,
-                            size: 48,
-                          ),
-                          const SizedBox(height: 16),
-                          TextWidget(
-                            text: 'Error loading medications',
-                            fontSize: 16,
-                            color: textSecondary,
-                            fontFamily: 'Medium',
-                          ),
-                        ],
-                      ),
-                    );
+                  final medications = snapshot.data!;
+                  final hasPendingMedications = medications.any((med) {
+                    return med.isCompleted.any((completed) => !completed);
+                  });
+
+                  if (!hasPendingMedications) {
+                    return const SizedBox.shrink();
                   }
 
-                  final medications = snapshot.data ?? [];
-
-                  if (medications.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.medication_outlined,
-                            color: textSecondary,
-                            size: 64,
-                          ),
-                          const SizedBox(height: 16),
-                          TextWidget(
-                            text: 'No medications added yet',
-                            fontSize: 18,
-                            color: textSecondary,
-                            fontFamily: 'Bold',
-                          ),
-                          const SizedBox(height: 8),
-                          TextWidget(
-                            text:
-                                'Tap the + button to add your first medication',
-                            fontSize: 14,
-                            color: textLight,
-                            fontFamily: 'Regular',
-                          ),
-                          const SizedBox(height: 24),
-                          ButtonWidget(
-                            label: 'Add Medication',
-                            onPressed: _showAddMedicationDialog,
-                            color: primary,
-                            width: 200,
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView.builder(
-                    itemCount: medications.length,
-                    itemBuilder: (context, index) {
-                      return _buildMedicationCard(medications[index], index);
+                  return MedicationBannerNotification(
+                    medications: medications,
+                    onMarkAsTaken: _markAsTaken,
+                    onDismiss: () {
+                      setState(() {
+                        _showBanner = false;
+                      });
                     },
                   );
                 },
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -472,6 +543,17 @@ class _MedicationScreenState extends State<MedicationScreen> {
         ),
       );
     }
+  }
+
+  void _dismissNotification(String notificationId) {
+    // For now, we'll just show a snackbar
+    // In a real implementation, you might want to track dismissed notifications
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Notification dismissed'),
+        backgroundColor: Colors.grey,
+      ),
+    );
   }
 
   void _markAsMissed(String medicationName) {
