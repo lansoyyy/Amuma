@@ -13,44 +13,68 @@ class _FAQScreenState extends State<FAQScreen> with TickerProviderStateMixin {
   // Sample FAQ data - this can be replaced with actual data from a service
   final List<Map<String, String>> _faqData = [
     {
-      'question': 'How do I track my medications?',
+      'question': 'What is Pag-Amuma?',
       'answer':
-          'Navigate to the Medications tab in the bottom navigation bar. Here you can add new medications, set reminders, and track your daily intake. You can also view your medication history and upcoming doses.'
+          'Pag-Amuma: A Culturally Tailored Mobile Health Application for Chronic Disease Self-Management Among Filipino Patients in Cebu City. It is a mobile health app designed to help Filipino patients with chronic illnesses manage their health through culturally tailored tools, education, and support.'
     },
     {
-      'question': 'How do I log my health vitals?',
+      'question': 'Who can use Pag-Amuma?',
       'answer':
-          'Go to the Health Diary tab to record your blood pressure, blood sugar levels, weight, and other health metrics. You can set reminders to log these regularly and view your progress over time in the charts section.'
+          'Individuals with chronic illnesses (diabetes, hypertension, kidney disease, respiratory problems, etc.), their families, and caregivers can use Pag-Amuma.'
     },
     {
-      'question': 'Can I set appointment reminders?',
+      'question': 'Is Pag-Amuma free?',
       'answer':
-          'Yes, in the Appointments tab, you can add upcoming medical appointments and set reminders. The app will send you notifications before your scheduled appointments to ensure you don\'t miss them.'
+          'Yes, Pag-Amuma is free to download and use. Some features may require internet connection.'
     },
     {
-      'question': 'How do I access health education content?',
+      'question': 'What languages are available in Pag-Amuma?',
+      'answer': 'Pag-Amuma is available in English and Sinugbuanong Binisaya.'
+    },
+    {
+      'question': 'How can this app help with health management?',
       'answer':
-          'The Learn tab provides curated health education articles and tips. You can browse by category or search for specific topics. Content is regularly updated with the latest health information.'
+          'Pag-Amuma provides reminders for medications, health education modules, symptom trackers, lifestyle tips, and resources to support your self-care.'
+    },
+    {
+      'question': 'Does Pag-Amuma replace my doctor?',
+      'answer':
+          'No. Pag-Amuma is a support tool for self-management but does not replace medical advice, diagnosis, or treatment. Always consult your healthcare provider.'
+    },
+    {
+      'question': 'Can I track symptoms and medications?',
+      'answer':
+          'Yes, you can record your medications, daily symptoms, and vital signs like blood pressure, sugar levels, or weight.'
+    },
+    {
+      'question': 'How do I create an account?',
+      'answer':
+          'Sign up using your email or phone number. Follow the guided registration steps.'
     },
     {
       'question': 'How is my data protected?',
       'answer':
-          'All your health data is securely stored and encrypted. We follow industry-standard security practices to protect your personal information. You can review our full privacy policy in the settings section.'
+          'Your data is securely stored and follows privacy standards. Only you can access your records.'
     },
     {
-      'question': 'How do I update my profile information?',
+      'question': 'What if I forgot my password?',
       'answer':
-          'Go to your profile by tapping the user icon in the top right corner of the Home screen. From there, you can update your personal information, health details, and emergency contacts.'
+          'Tap "Forgot Password" on the login screen and follow the instructions to reset it.'
     },
     {
-      'question': 'What should I do if I miss a medication dose?',
+      'question': 'Who developed Pag-Amuma?',
       'answer':
-          'If you miss a dose, take it as soon as you remember. However, if it\'s almost time for your next dose, skip the missed dose and continue with your regular schedule. Log the missed dose in the app for your records and consult your healthcare provider if you\'re unsure.'
+          'Pag-Amuma was developed by a research team in Cebu City to support Filipino patients with chronic diseases through culturally appropriate health technology.'
     },
     {
-      'question': 'How do I contact support?',
+      'question': 'How do I report problems with the app?',
       'answer':
-          'You can reach our support team by going to Settings > Help & Support > Contact Us. Fill out the form with your query and our team will respond within 24-48 hours.'
+          'Use the "Help & Support" section of the app or email the support team.'
+    },
+    {
+      'question': 'How can I suggest improvements?',
+      'answer':
+          'We welcome your feedback! Please use the "Feedback" button in the app.'
     },
   ];
 
