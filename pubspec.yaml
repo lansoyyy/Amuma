@@ -59,6 +59,9 @@ dependencies:
   http: ^1.1.0
   json_annotation: ^4.8.1
   
+  # UUID Generation
+  uuid: ^4.2.1
+  
   # URL Launcher and Share
   url_launcher: ^6.2.2
   share_plus: ^7.2.2

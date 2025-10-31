@@ -8,6 +8,11 @@ class MedicationModel {
   final List<String> times;
   final List<bool> isCompleted;
   final DateTime createdAt;
+  final bool isRecurring;
+  final List<int> recurringDays; // 0-6 (Sunday-Saturday)
+  final String recurringType; // 'daily', 'weekdays', 'specific_days'
+  final DateTime? startDate;
+  final DateTime? endDate;
 
   MedicationModel({
     required this.id,
@@ -16,6 +21,11 @@ class MedicationModel {
     required this.times,
     required this.isCompleted,
     required this.createdAt,
+    this.isRecurring = false,
+    this.recurringDays = const [],
+    this.recurringType = 'daily',
+    this.startDate,
+    this.endDate,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +36,11 @@ class MedicationModel {
       'times': jsonEncode(times),
       'isCompleted': jsonEncode(isCompleted),
       'createdAt': createdAt.toIso8601String(),
+      'isRecurring': isRecurring,
+      'recurringDays': jsonEncode(recurringDays),
+      'recurringType': recurringType,
+      'startDate': startDate?.toIso8601String(),
+      'endDate': endDate?.toIso8601String(),
     };
   }
 
@@ -50,6 +65,16 @@ class MedicationModel {
       isCompletedList = [];
     }
 
+    // Handle recurringDays field
+    List<int> recurringDaysList;
+    if (map['recurringDays'] is String) {
+      recurringDaysList = List<int>.from(jsonDecode(map['recurringDays']));
+    } else if (map['recurringDays'] is List) {
+      recurringDaysList = List<int>.from(map['recurringDays']);
+    } else {
+      recurringDaysList = [];
+    }
+
     return MedicationModel(
       id: map['id'],
       name: map['name'],
@@ -57,6 +82,12 @@ class MedicationModel {
       times: timesList,
       isCompleted: isCompletedList,
       createdAt: DateTime.parse(map['createdAt']),
+      isRecurring: map['isRecurring'] ?? false,
+      recurringDays: recurringDaysList,
+      recurringType: map['recurringType'] ?? 'daily',
+      startDate:
+          map['startDate'] != null ? DateTime.parse(map['startDate']) : null,
+      endDate: map['endDate'] != null ? DateTime.parse(map['endDate']) : null,
     );
   }
 }

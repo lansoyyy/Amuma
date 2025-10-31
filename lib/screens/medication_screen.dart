@@ -6,6 +6,7 @@ import 'package:amuma/widgets/medication_notification_widget.dart';
 import 'package:amuma/widgets/medication_banner_notification.dart';
 import 'package:amuma/services/firebase_service.dart';
 import 'package:amuma/models/data_models.dart';
+import 'package:amuma/screens/add_recurring_medication_screen.dart';
 import 'package:intl/intl.dart';
 
 class MedicationScreen extends StatefulWidget {
@@ -21,13 +22,37 @@ class _MedicationScreenState extends State<MedicationScreen> {
   final TextEditingController _dosageController = TextEditingController();
   List<String> _medicationTimes = [];
   List<MedicationModel> _medications = [];
+  List<MedicationModel> _recurringMedications = [];
   bool _showBanner = true;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _generateDailyMedications();
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _dosageController.dispose();
     super.dispose();
+  }
+
+  Future<void> _generateDailyMedications() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _firebaseService.generateDailyMedications();
+    } catch (e) {
+      print('Error generating daily medications: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -44,9 +69,42 @@ class _MedicationScreenState extends State<MedicationScreen> {
           fontFamily: 'Bold',
         ),
         actions: [
-          IconButton(
-            onPressed: _showAddMedicationDialog,
+          PopupMenuButton<String>(
             icon: const Icon(Icons.add, color: primary),
+            onSelected: (value) {
+              if (value == 'single') {
+                _showAddMedicationDialog();
+              } else if (value == 'recurring') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AddRecurringMedicationScreen(),
+                  ),
+                );
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'single',
+                child: Row(
+                  children: [
+                    Icon(Icons.add_circle_outline),
+                    SizedBox(width: 8),
+                    Text('Add Single Day'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'recurring',
+                child: Row(
+                  children: [
+                    Icon(Icons.repeat),
+                    SizedBox(width: 8),
+                    Text('Add Recurring'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -812,6 +870,205 @@ class _MedicationScreenState extends State<MedicationScreen> {
           backgroundColor: healthRed,
         ),
       );
+    }
+  }
+
+  Widget _buildRecurringMedicationCard(MedicationModel medication) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: primary.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: primary.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.repeat,
+                  color: primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextWidget(
+                      text: medication.name,
+                      fontSize: 16,
+                      color: textLight,
+                      fontFamily: 'Bold',
+                    ),
+                    TextWidget(
+                      text: medication.dosage,
+                      fontSize: 14,
+                      color: textGrey,
+                      fontFamily: 'Regular',
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: TextWidget(
+                            text:
+                                _getRecurringTypeText(medication.recurringType),
+                            fontSize: 10,
+                            color: Colors.blue,
+                            fontFamily: 'Medium',
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () =>
+                              _showDeleteRecurringConfirmation(medication.id),
+                          icon: const Icon(Icons.delete_outline,
+                              color: healthRed),
+                          iconSize: 20,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Time slots
+          ...medication.times.asMap().entries.map((entry) {
+            final timeIndex = entry.key;
+            final time = entry.value;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.access_time,
+                    color: textGrey,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextWidget(
+                      text: time,
+                      fontSize: 14,
+                      color: textLight,
+                      fontFamily: 'Medium',
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  String _getRecurringTypeText(String type) {
+    switch (type) {
+      case 'daily':
+        return 'Daily';
+      case 'weekdays':
+        return 'Weekdays';
+      case 'specific_days':
+        return 'Specific Days';
+      default:
+        return 'Recurring';
+    }
+  }
+
+  Future<void> _showDeleteRecurringConfirmation(String medicationId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: TextWidget(
+          text: 'Delete Recurring Medication',
+          fontSize: 18,
+          color: textLight,
+          fontFamily: 'Bold',
+        ),
+        content: TextWidget(
+          text:
+              'This will stop all future medication generation. Are you sure?',
+          fontSize: 14,
+          color: textGrey,
+          fontFamily: 'Regular',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: TextWidget(
+              text: 'Cancel',
+              fontSize: 14,
+              color: textSecondary,
+              fontFamily: 'Medium',
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: TextWidget(
+              text: 'Delete',
+              fontSize: 14,
+              color: healthRed,
+              fontFamily: 'Medium',
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final success =
+          await _firebaseService.deleteRecurringMedication(medicationId);
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Recurring medication deleted successfully'),
+            backgroundColor: healthGreen,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete recurring medication'),
+            backgroundColor: healthRed,
+          ),
+        );
+      }
     }
   }
 

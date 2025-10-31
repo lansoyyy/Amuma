@@ -32,6 +32,15 @@ class FirebaseService {
           .collection('medications')
           .doc(medication.id)
           .set(medication.toMap());
+
+      // If it's a recurring medication, also add it to recurring collection
+      if (medication.isRecurring) {
+        await userDoc
+            .collection('recurring_medications')
+            .doc(medication.id)
+            .set(medication.toMap());
+      }
+
       return true;
     } catch (e) {
       return false;
@@ -107,6 +116,135 @@ class FirebaseService {
       };
     } catch (e) {
       return {};
+    }
+  }
+
+  // Get recurring medications
+  Stream<List<MedicationModel>> getRecurringMedications() {
+    final userDoc = _userDocRef;
+    if (userDoc == null) return Stream.value([]);
+
+    return userDoc
+        .collection('recurring_medications')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map(
+                (doc) => MedicationModel.fromMap({...doc.data(), 'id': doc.id}))
+            .toList());
+  }
+
+  // Generate daily medications from recurring ones
+  Future<List<MedicationModel>> generateDailyMedications() async {
+    try {
+      final userDoc = _userDocRef;
+      if (userDoc == null) return [];
+
+      final recurringMedsSnapshot =
+          await userDoc.collection('recurring_medications').get();
+
+      final today = DateTime.now();
+      final todayWeekday = today.weekday % 7; // 0=Sunday, 6=Saturday
+      final todayDateOnly = DateTime(today.year, today.month, today.day);
+
+      List<MedicationModel> dailyMeds = [];
+
+      for (var doc in recurringMedsSnapshot.docs) {
+        final recurringMed =
+            MedicationModel.fromMap({...doc.data(), 'id': doc.id});
+
+        // Check if medication should be generated today
+        bool shouldGenerate = false;
+
+        if (recurringMed.recurringType == 'daily') {
+          shouldGenerate = true;
+        } else if (recurringMed.recurringType == 'weekdays' &&
+            todayWeekday >= 1 &&
+            todayWeekday <= 5) {
+          shouldGenerate = true;
+        } else if (recurringMed.recurringType == 'specific_days') {
+          shouldGenerate = recurringMed.recurringDays.contains(todayWeekday);
+        }
+
+        // Check date range
+        if (shouldGenerate && recurringMed.startDate != null) {
+          if (todayDateOnly.isBefore(recurringMed.startDate!)) {
+            shouldGenerate = false;
+          }
+        }
+
+        if (shouldGenerate && recurringMed.endDate != null) {
+          if (todayDateOnly.isAfter(recurringMed.endDate!)) {
+            shouldGenerate = false;
+          }
+        }
+
+        if (shouldGenerate) {
+          // Check if already generated for today
+          final existingMed = await userDoc
+              .collection('medications')
+              .where('name', isEqualTo: recurringMed.name)
+              .where('createdAt',
+                  isGreaterThanOrEqualTo: todayDateOnly.toIso8601String())
+              .get();
+
+          if (existingMed.docs.isEmpty) {
+            // Generate today's medication from recurring template
+            final dailyMed = MedicationModel(
+              id: '${recurringMed.id}_${todayDateOnly.millisecondsSinceEpoch}',
+              name: recurringMed.name,
+              dosage: recurringMed.dosage,
+              times: recurringMed.times,
+              isCompleted: List.filled(recurringMed.times.length, false),
+              createdAt: todayDateOnly,
+              isRecurring: false, // Generated daily med is not recurring itself
+              recurringDays: [],
+              recurringType: 'daily',
+              startDate: null,
+              endDate: null,
+            );
+
+            await addMedication(dailyMed);
+            dailyMeds.add(dailyMed);
+          }
+        }
+      }
+
+      return dailyMeds;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Save recurring medication
+  Future<bool> saveRecurringMedication(MedicationModel medication) async {
+    try {
+      final userDoc = _userDocRef;
+      if (userDoc == null) return false;
+
+      await userDoc
+          .collection('recurring_medications')
+          .doc(medication.id)
+          .set(medication.toMap());
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Delete recurring medication
+  Future<bool> deleteRecurringMedication(String medicationId) async {
+    try {
+      final userDoc = _userDocRef;
+      if (userDoc == null) return false;
+
+      await userDoc
+          .collection('recurring_medications')
+          .doc(medicationId)
+          .delete();
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 
@@ -728,17 +866,10 @@ class FirebaseService {
       return {
         'medicationStats': medicationStats,
         'userStats': userStats,
-        'greeting': _getGreeting(),
+        'greeting': 'Good Day!',
       };
     } catch (e) {
       return {};
     }
-  }
-
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning!';
-    if (hour < 17) return 'Good afternoon!';
-    return 'Good evening!';
   }
 }

@@ -4,7 +4,9 @@ import 'package:amuma/widgets/text_widget.dart';
 import 'package:amuma/widgets/button_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:amuma/services/firebase_service.dart';
+import 'package:amuma/services/local_storage_service.dart';
 import 'package:amuma/models/data_models.dart';
+import 'package:amuma/screens/check_in_history_screen.dart';
 
 class GamificationScreen extends StatefulWidget {
   const GamificationScreen({super.key});
@@ -15,6 +17,169 @@ class GamificationScreen extends StatefulWidget {
 
 class _GamificationScreenState extends State<GamificationScreen> {
   final FirebaseService _firebaseService = FirebaseService();
+  final LocalStorageService _localStorageService = LocalStorageService();
+
+  bool _isCheckedInToday = false;
+  DateTime? _lastCheckInDate;
+  bool _isCheckingIn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkTodayCheckInStatus();
+  }
+
+  Future<void> _checkTodayCheckInStatus() async {
+    final lastCheckIn = _localStorageService.getString('last_check_in_date');
+    if (lastCheckIn != null) {
+      final lastDate = DateTime.parse(lastCheckIn);
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      final lastDateOnly =
+          DateTime(lastDate.year, lastDate.month, lastDate.day);
+
+      setState(() {
+        _lastCheckInDate = lastDate;
+        _isCheckedInToday = todayDate.isAtSameMomentAs(lastDateOnly);
+      });
+    }
+  }
+
+  Future<void> _performDailyCheckIn() async {
+    if (_isCheckedInToday || _isCheckingIn) return;
+
+    setState(() {
+      _isCheckingIn = true;
+    });
+
+    try {
+      final now = DateTime.now();
+      final todayDateOnly = DateTime(now.year, now.month, now.day);
+
+      // Save today's check-in
+      await _localStorageService.setString(
+          'last_check_in_date', now.toIso8601String());
+
+      // Update streaks
+      await _updateStreaks(_lastCheckInDate);
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              TextWidget(
+                text: 'Daily check-in successful! Keep up the streak!',
+                fontSize: 14,
+                color: Colors.white,
+                fontFamily: 'Medium',
+              ),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      setState(() {
+        _isCheckedInToday = true;
+        _lastCheckInDate = now;
+        _isCheckingIn = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isCheckingIn = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: TextWidget(
+            text: 'Check-in failed. Please try again.',
+            fontSize: 14,
+            color: Colors.white,
+            fontFamily: 'Medium',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _updateStreaks(DateTime? lastCheckIn) async {
+    final now = DateTime.now();
+    final todayDateOnly = DateTime(now.year, now.month, now.day);
+
+    // Check if last check-in was yesterday to continue streak
+    bool isConsecutiveDay = false;
+    if (lastCheckIn != null) {
+      final lastDateOnly =
+          DateTime(lastCheckIn.year, lastCheckIn.month, lastCheckIn.day);
+      final yesterday = todayDateOnly.subtract(Duration(days: 1));
+      isConsecutiveDay = lastDateOnly.isAtSameMomentAs(yesterday);
+    }
+
+    // Get current streaks
+    final streaks = await _firebaseService.getStreaks().first;
+
+    // Update attendance streak
+    final attendanceStreak = streaks.firstWhere(
+      (s) => s.type == 'attendance',
+      orElse: () => StreakModel(
+        id: 'attendance_streak',
+        type: 'attendance',
+        count: 0,
+        lastUpdate: DateTime.now(),
+      ),
+    );
+
+    int newCount = isConsecutiveDay ? attendanceStreak.count + 1 : 1;
+
+    await _firebaseService.saveStreak(
+      StreakModel(
+        id: attendanceStreak.id,
+        type: 'attendance',
+        count: newCount,
+        lastUpdate: DateTime.now(),
+      ),
+    );
+
+    // Update badge progress for check-in achievements
+    await _updateCheckInBadges(newCount);
+  }
+
+  Future<void> _updateCheckInBadges(int checkInCount) async {
+    final badges = await _firebaseService.getBadges().first;
+
+    for (var badge in badges) {
+      if (badge.name.toLowerCase().contains('check-in') ||
+          badge.name.toLowerCase().contains('attendance')) {
+        final newProgress =
+            checkInCount > badge.progress ? checkInCount : badge.progress;
+
+        // Update badge progress
+        await _firebaseService.saveBadge(
+          BadgeModel(
+            id: badge.id,
+            name: badge.name,
+            description: badge.description,
+            icon: badge.icon,
+            color: badge.color,
+            dateEarned:
+                newProgress >= badge.target ? DateTime.now() : badge.dateEarned,
+            progress: newProgress,
+            target: badge.target,
+          ),
+        );
+
+        // Award badge if target reached
+        if (newProgress >= badge.target && badge.dateEarned == null) {
+          await _firebaseService.awardBadge(badge.id);
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +223,7 @@ class _GamificationScreenState extends State<GamificationScreen> {
           final medicationStreak = _getStreakCount(streaks, 'medication');
           final healthDiaryStreak = _getStreakCount(streaks, 'health_diary');
           final appointmentStreak = _getStreakCount(streaks, 'appointment');
+          final attendanceStreak = _getStreakCount(streaks, 'attendance');
 
           return StreamBuilder<List<BadgeModel>>(
             stream: _firebaseService.getBadges(),
@@ -107,13 +273,13 @@ class _GamificationScreenState extends State<GamificationScreen> {
                           ),
                           const SizedBox(height: 12),
                           TextWidget(
-                            text: '$medicationStreak',
+                            text: '$attendanceStreak',
                             fontSize: 36,
                             color: buttonText,
                             fontFamily: 'Bold',
                           ),
                           TextWidget(
-                            text: 'Day Medication Streak',
+                            text: 'Day Check-in Streak',
                             fontSize: 16,
                             color: buttonText.withOpacity(0.9),
                             fontFamily: 'Medium',
@@ -131,25 +297,124 @@ class _GamificationScreenState extends State<GamificationScreen> {
 
                     const SizedBox(height: 24),
 
+                    // Daily Check-in Section
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: primary.withOpacity(0.3)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: primary.withOpacity(0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.how_to_reg,
+                                  color: primary,
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    TextWidget(
+                                      text: 'Daily Check-in',
+                                      fontSize: 18,
+                                      color: textLight,
+                                      fontFamily: 'Bold',
+                                    ),
+                                    const SizedBox(height: 4),
+                                    TextWidget(
+                                      text: _isCheckedInToday
+                                          ? 'Checked in today! Come back tomorrow.'
+                                          : 'Check in now to maintain your streak!',
+                                      fontSize: 12,
+                                      color: textGrey,
+                                      fontFamily: 'Regular',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ButtonWidget(
+                              label: _isCheckingIn
+                                  ? 'Checking in...'
+                                  : _isCheckedInToday
+                                      ? '✓ Checked In Today'
+                                      : 'Check In Now',
+                              onPressed: () {
+                                if (!_isCheckedInToday && !_isCheckingIn) {
+                                  _performDailyCheckIn();
+                                }
+                              },
+                              color: _isCheckedInToday ? Colors.grey : primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
                     // Other streaks
                     Row(
                       children: [
                         Expanded(
                           child: _buildStreakCard(
-                            'Health Diary',
-                            healthDiaryStreak,
-                            Icons.favorite,
+                            'Medication',
+                            medicationStreak,
+                            Icons.medication,
                             accent,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildStreakCard(
+                            'Health Diary',
+                            healthDiaryStreak,
+                            Icons.favorite,
+                            primary,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildStreakCard(
                             'Appointments',
                             appointmentStreak,
                             Icons.calendar_today,
-                            primary,
+                            accent,
                           ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildCheckInHistoryCard(),
                         ),
                       ],
                     ),
@@ -281,6 +546,61 @@ class _GamificationScreenState extends State<GamificationScreen> {
       ),
     );
     return streak.count;
+  }
+
+  Widget _buildCheckInHistoryCard() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const CheckInHistoryScreen(),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: primary.withOpacity(0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: primary.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.history, color: primary, size: 24),
+            ),
+            const SizedBox(height: 8),
+            TextWidget(
+              text: 'History',
+              fontSize: 12,
+              color: textLight,
+              fontFamily: 'Bold',
+              align: TextAlign.center,
+            ),
+            TextWidget(
+              text: 'View all',
+              fontSize: 10,
+              color: primary,
+              fontFamily: 'Regular',
+              align: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildStreakCard(

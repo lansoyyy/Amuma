@@ -4,6 +4,7 @@ import 'package:amuma/screens/dashboard_screen.dart';
 import 'package:amuma/screens/profile_setup_screen.dart';
 import 'package:amuma/services/local_storage_service.dart';
 import 'package:amuma/services/auth_service.dart';
+import 'package:amuma/services/badge_service.dart';
 import 'package:amuma/utils/colors.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +17,9 @@ void main() async {
   );
 
   await LocalStorageService().initialize();
+
+  // Initialize default badges for check-in system
+  await BadgeService().initializeDefaultBadges();
 
   runApp(const MyApp());
 }
